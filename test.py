@@ -2,8 +2,10 @@ import numpy as np
 import os
 from dotenv import load_dotenv
 from google import genai
+from langchain_ollama import ChatOllama
 
 load_dotenv()
+llm = ChatOllama(model="llama3.2")
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -23,7 +25,7 @@ documents = [
 
 "SPECIAL NOTICE:During university festivals, all service timings may be revised except emergency medical services. The student handbook should be checked for updated schedules." ]
 
-query = "I am a first-year student studying during exams with a university ID. If I leave the library at 11:45 PM, will I be allowed inside the hostel without any issue?"
+query = "What time can I use the 3D printer?"
 
 def get_embedding(text, model="gemini-embedding-2"):
     result = client.models.embed_content(model=model, contents=[text])
@@ -42,22 +44,47 @@ query_vector = get_embedding(query)
 def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-best_score = -1
-best_doc = ""
+#7. TOP-K RETRIEVAL (IMPORTANT CHANGE)
+
+scores = []
 
 for doc in embedded_docs:
     score = cosine_similarity(query_vector, doc["vector"])
-    if score > best_score:
-        best_score = score
-        best_doc = doc["text"]
+    scores.append((score, doc["text"]))
 
-print("Best match:", best_doc)
-print("Score:", best_score)
+#8. sort highest similarity first
+scores.sort(reverse=True)
 
-"""response = client.models.generate_content(
-    model="models/gemini-2.0-flash-lite",
-    contents=f"Answer the question using only the notice below. Notice: {best_doc} Question: {query}"
-)
-print(response.text)"""
+top_k = 3
+top_docs = [text for score, text in scores[:top_k]]
 
 
+#9. CONTEXT BUILDING
+context = "\n\n".join(top_docs)
+
+#10. Providing context to the llm(ollama)
+def generate_answer(query, context):
+    prompt = f"""
+You are a strict and helpful assistant.
+
+RULES:
+- Use ONLY the given context.
+- If answer is not in context, say "I don't know based on the provided information."
+- Do NOT use outside knowledge.
+
+CONTEXT:
+{context}
+
+QUESTION:
+{query}
+
+ANSWER:
+"""
+    response = llm.invoke(prompt)
+    return response.content
+
+#11. OUTPUT
+final_answer = generate_answer(query, context)
+
+print("\nFINAL ANSWER:\n")
+print(final_answer)
