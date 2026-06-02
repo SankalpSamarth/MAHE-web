@@ -31,11 +31,31 @@ def get_embedding(text, model="gemini-embedding-2"):
     result = client.models.embed_content(model=model, contents=[text])
     return result.embeddings[0].values
 
-# 4. Embed all documents and store them in a plain Python list
+#Chunk function to convert a text into smaller chunks
+def chunk_text(text, chunk_size=20, overlap=8):
+    words = text.split()
+    chunks = []
+
+    i = 0
+    while i < len(words):
+        chunk = words[i:i + chunk_size]
+        chunks.append(" ".join(chunk))
+        i += chunk_size - overlap
+
+    return chunks
+
+# 4. Embed all documents
 embedded_docs = []
+
 for doc in documents:
-    vector = get_embedding(doc)
-    embedded_docs.append({"text": doc, "vector": vector})
+    chunks = chunk_text(doc)
+
+    for chunk in chunks:
+        vector = get_embedding(chunk)
+        embedded_docs.append({
+            "text": chunk,
+            "vector": vector
+        })
 
 # 5. Embed the query
 query_vector = get_embedding(query)
