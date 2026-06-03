@@ -5,6 +5,10 @@ from google import genai
 from langchain_ollama import ChatOllama
 import fitz
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+import chromadb
+
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+collection = chroma_client.get_or_create_collection(name="college_docs")
 
 load_dotenv()
 llm = ChatOllama(model="llama3.2")
@@ -26,51 +30,27 @@ def get_embedding(text, model="gemini-embedding-2"):
     result = client.models.embed_content(model=model, contents=[text])
     return result.embeddings[0].values
 
-#Chunk function to convert a text into smaller chunks
-"""def chunk_text(text, chunk_size=20, overlap=8):
-    words = text.split()
-    chunks = []
+# Store chunks in ChromaDB
+if collection.count() == 0:
+    print("Ingesting documents...")
+    for i, chunk in enumerate(documents):
+        vector = get_embedding(chunk)
+        collection.add(
+            ids=[f"chunk_{i}"],
+            embeddings=[vector],
+            documents=[chunk]
+        )
+    print(f"Total chunks stored: {collection.count()}")
+else:
+    print(f"Collection already has {collection.count()} chunks, skipping ingestion.")
 
-    i = 0
-    while i < len(words):
-        chunk = words[i:i + chunk_size]
-        chunks.append(" ".join(chunk))
-        i += chunk_size - overlap
+# Query ChromaDB
+results = collection.query(
+    query_embeddings=[get_embedding(query)],
+    n_results=3
+)
 
-    return chunks"""
-
-# 4. Embed all documents
-embedded_docs = []
-
-for doc in documents:
-    vector = get_embedding(doc)
-    embedded_docs.append({"text": doc, "vector": vector})
-
-# 5. Embed the query
-query_vector = get_embedding(query)
-
-# 6. Loop and compute cosine similarity
-def cosine_similarity(a, b):
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
-#7. TOP-K RETRIEVAL (IMPORTANT CHANGE)
-
-scores = []
-
-for doc in embedded_docs:
-    score = cosine_similarity(query_vector, doc["vector"])
-    scores.append((score, doc["text"]))
-
-#8. sort highest similarity first
-scores.sort(reverse=True)
-
-top_k = 3
-top_docs = [text for score, text in scores[:top_k]]
-
-print("TOP RETRIEVED CHUNKS:")
-for i, text in enumerate(top_docs):
-    print(f"\n--- Chunk {i+1} ---")
-    print(text)
+top_docs = results["documents"][0]
 
 
 #9. CONTEXT BUILDING
