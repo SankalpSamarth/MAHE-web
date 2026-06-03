@@ -21,10 +21,9 @@ full_text = ""
 for page in doc:
     full_text += page.get_text()
 
-splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 documents = splitter.split_text(full_text)
 
-query = "What happens to the job if thread cutting goes wrong?"
 
 def get_embedding(text, model="gemini-embedding-2"):
     result = client.models.embed_content(model=model, contents=[text])
@@ -44,14 +43,52 @@ if collection.count() == 0:
 else:
     print(f"Collection already has {collection.count()} chunks, skipping ingestion.")
 
-# Query ChromaDB
-results = collection.query(
-    query_embeddings=[get_embedding(query)],
-    n_results=3
-)
+# For Semantic Matching with the original query
 
-top_docs = results["documents"][0]
+query = "What is the function of the tailstock?"
 
+def rewrite_query(original_query):
+    prompt = f"""Generate 3 different ways to ask the following question. 
+Return ONLY the 3 questions, numbered 1-3, nothing else.
+
+Original question: {original_query}
+
+Rewritten questions:"""
+    
+    response = llm.invoke(prompt)
+    lines = response.content.splitlines()
+    parsed_list = [line.split(". ", 1)[1] for line in lines if line.strip() and line[0].isdigit()]
+    return parsed_list
+
+
+rewritten_queries = rewrite_query(query)
+print("Rewritten queries:")
+for q in rewritten_queries:
+    print(q)
+
+#Query ChromaDB
+
+all_chunks = []
+seen = set()
+
+queries_to_search = [query] + rewritten_queries
+
+for q in queries_to_search:
+    results = collection.query(
+        query_embeddings=[get_embedding(q)],
+        n_results=5
+    )
+    for chunk in results["documents"][0]:
+        if chunk not in seen:
+            seen.add(chunk)
+            all_chunks.append(chunk)
+
+top_docs = all_chunks[:5]
+
+print(f"\nTotal unique chunks retrieved: {len(all_chunks)}")
+print("\n--- RETRIEVED CHUNKS ---")
+for i, chunk in enumerate(all_chunks):
+    print(f"\nChunk {i+1}:\n{chunk}")
 
 #9. CONTEXT BUILDING
 context = "\n\n".join(top_docs)
@@ -77,6 +114,7 @@ ANSWER:
 """
     response = llm.invoke(prompt)
     return response.content
+
 
 #11. OUTPUT
 final_answer = generate_answer(query, context)
