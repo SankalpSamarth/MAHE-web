@@ -6,6 +6,7 @@ from langchain_ollama import ChatOllama
 import fitz
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
+import glob
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,10 +22,12 @@ chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="college_docs")
 
 # Read PDF and extract full text
-doc = fitz.open("notices.pdf")
 full_text = ""
-for page in doc:
-    full_text += page.get_text()
+pdf_files = glob.glob("documents/*.pdf")
+for pdf_path in pdf_files:
+    doc = fitz.open(pdf_path)
+    for page in doc:
+        full_text += page.get_text()
 
 # Split full text into overlapping chunks
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
