@@ -12,7 +12,7 @@ import glob
 load_dotenv()
 
 # Initialize Ollama LLM
-llm = ChatOllama(model="llama3.2")
+llm = ChatOllama(model="qwen2.5:7b")
 
 # Initialize Google Generative AI client
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -65,17 +65,15 @@ Rewritten questions:"""
 # Generate final answer using retrieved context
 def generate_answer(query, context):
     prompt = f"""
-You are a strict and helpful assistant. Read the context carefully and answer only from it.
-RULES:
-- Find the relevant sentence in the context and base your answer on it.
-- Quote or closely paraphrase the context. Do not add anything else.
-- If the answer is truly not present, say: "I don't have information about this in the provided documents."
-- Do NOT guess, infer, or use outside knowledge under any circumstances.
+You are a helpful assistant. Answer the question using ONLY the information in the context below.
+
 CONTEXT:
 {context}
+
 QUESTION:
 {query}
-ANSWER:
+
+ANSWER (based only on the context above):
 """
     response = llm.invoke(prompt)
     return response.content
@@ -102,5 +100,8 @@ def ask(query):
     # Step 4: build context from top chunks
     context = "\n\n".join(all_chunks[:5])
 
+
+
     # Step 5: generate and return final answer
     return generate_answer(query, context)
+
