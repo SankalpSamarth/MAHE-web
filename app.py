@@ -1,5 +1,5 @@
 import streamlit as st
-from test import ask
+from rag_pipeline import ask
 
 st.title("College AI Assistant 🎓")
 st.write("Ask anything about your college documents.")
