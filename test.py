@@ -7,6 +7,9 @@ import fitz
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import chromadb
 import glob
+import pytesseract
+from pdf2image import convert_from_path
+from PIL import Image
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,13 +24,29 @@ client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="college_docs")
 
+#For extracting text with ocr
+def extract_text_with_ocr(pdf_path):
+    text = ""
+    images = convert_from_path(pdf_path)
+    for image in images:
+        text += pytesseract.image_to_string(image)
+    return text
+
 # Read PDF and extract full text
 full_text = ""
 pdf_files = glob.glob("documents/*.pdf")
 for pdf_path in pdf_files:
     doc = fitz.open(pdf_path)
-    for page in doc:
-        full_text += page.get_text()
+    # Check if PDF has extractable text
+    sample = doc[0].get_text()
+    if len(sample) > 100:
+        # Normal text PDF
+        for page in doc:
+            full_text += page.get_text()
+    else:
+        # Scanned PDF — use OCR
+        print(f"Using OCR for {pdf_path}")
+        full_text += extract_text_with_ocr(pdf_path)
 
 # Split full text into overlapping chunks
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -103,5 +122,5 @@ def ask(query):
 
 
     # Step 5: generate and return final answer
-    return generate_answer(query, context)
+    return generate_answer(query, context), all_chunks[:5]
 
