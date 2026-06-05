@@ -160,8 +160,8 @@ MAHE-web/
 ### Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/MAHE-web.git
-cd MAHE-web
+git clone https://github.com/yourusername/SemanticIQ-Semantic-RAG-Document-Intelligence-Platform.git
+cd SemanticIQ-Semantic-RAG-Document-Intelligence-Platform
 ```
 
 ### Create Virtual Environment
